@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+pymysql
+cryptography
+pydantic-settings
+pyjwt
+bcrypt
+python-dotenv
+slowapi
+pytest
+httpx
