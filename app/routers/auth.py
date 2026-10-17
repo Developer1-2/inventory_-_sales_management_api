@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from typing import Any
-
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy import text
 
 from app.core.db import get_conn, transaction
 from app.core.errors import AppError
+from app.core.limiting import limiter
 from app.core.security import create_access_token, hash_password, verify_password
 from app.deps import get_auth
 from app.schemas.auth import (
@@ -16,12 +15,18 @@ from app.schemas.auth import (
     RegisterBusinessRequest,
     TokenResponse,
 )
+from app.schemas.me import AuthMeResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register-business", response_model=TokenResponse)
-def register_business(payload: RegisterBusinessRequest, conn=Depends(get_conn)) -> TokenResponse:
+@limiter.limit("10/minute")
+def register_business(
+    request: Request,
+    payload: RegisterBusinessRequest,
+    conn=Depends(get_conn),
+) -> TokenResponse:
     normalized_email = payload.email.lower()
     existing = conn.execute(
         text("SELECT id FROM users WHERE email = :email"),
@@ -85,20 +90,35 @@ def register_business(payload: RegisterBusinessRequest, conn=Depends(get_conn)) 
 
 
 @router.post("/login", response_model=TokenResponse | LoginBusinessChoiceResponse)
-def login(payload: LoginRequest, conn=Depends(get_conn)) -> TokenResponse | LoginBusinessChoiceResponse:
+@limiter.limit("10/minute")
+def login(
+    request: Request,
+    payload: LoginRequest,
+    conn=Depends(get_conn),
+) -> TokenResponse | LoginBusinessChoiceResponse:
     normalized_email = payload.email.lower()
-    memberships = conn.execute(
-        text(
-            "SELECT m.id AS membership_id, m.business_id, b.name AS business_name, m.role, u.id AS user_id, u.password_hash "
-            "FROM memberships m "
-            "JOIN businesses b ON b.id = m.business_id "
-            "JOIN users u ON u.id = m.user_id "
-            "WHERE u.email = :email AND m.is_active = 1"
-        ),
-        {"email": normalized_email},
-    ).fetchall()
+    membership_query = (
+        "SELECT m.id AS membership_id, m.business_id, b.name AS business_name, "
+        "m.role, u.id AS user_id, u.password_hash "
+        "FROM memberships m "
+        "JOIN businesses b ON b.id = m.business_id "
+        "JOIN users u ON u.id = m.user_id "
+        "WHERE u.email = :email AND m.is_active = 1"
+    )
+    membership_params: dict[str, object] = {"email": normalized_email}
+    if payload.business_id is not None:
+        membership_query += " AND m.business_id = :business_id"
+        membership_params["business_id"] = payload.business_id
+    memberships = conn.execute(text(membership_query), membership_params).fetchall()
 
     if not memberships:
+        if payload.business_id is not None:
+            user = conn.execute(
+                text("SELECT password_hash FROM users WHERE email = :email"),
+                {"email": normalized_email},
+            ).fetchone()
+            if user is not None and verify_password(payload.password, user[0]):
+                raise AppError(404, "business_not_found", "Business not found for this user")
         raise AppError(401, "invalid_credentials", "Invalid email or password")
 
     user_id = memberships[0][4]
@@ -161,12 +181,13 @@ def login(payload: LoginRequest, conn=Depends(get_conn)) -> TokenResponse | Logi
     )
 
 
-@router.get("/me")
-def me(auth=Depends(get_auth)) -> dict[str, Any]:
-    return {
-        "user_id": auth.user_id,
-        "business_id": auth.business_id,
-        "role": auth.role,
-        "membership_id": auth.membership_id,
-        "location_ids": auth.location_ids,
-    }
+@router.get("/me", response_model=AuthMeResponse)
+@limiter.limit("30/minute")
+def me(request: Request, auth=Depends(get_auth)) -> AuthMeResponse:
+    return AuthMeResponse(
+        user_id=auth.user_id,
+        business_id=auth.business_id,
+        role=auth.role,
+        membership_id=auth.membership_id,
+        location_ids=auth.location_ids,
+    )

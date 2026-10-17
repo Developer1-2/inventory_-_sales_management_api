@@ -9,6 +9,7 @@ from sqlalchemy import create_engine, text
 
 from app.core.config import settings
 from app.core.db import get_conn
+from app.core.limiting import limiter
 from app.main import app
 
 SCHEMA_PATH = Path(__file__).resolve().parents[1] / "db" / "schema.sql"
@@ -67,6 +68,7 @@ def mysql_engine():
 
 @pytest.fixture(scope="function")
 def client(mysql_engine):
+    limiter.reset()
     with mysql_engine.begin() as conn:
         conn.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
         table_names = conn.execute(

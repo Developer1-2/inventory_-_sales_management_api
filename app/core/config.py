@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,6 +17,7 @@ class Settings(BaseSettings):
     test_db_name: str = "inventory_sales_test"
     jwt_secret: str = "development-only-change-this-secret"
     jwt_expires_minutes: int = 60
+    cors_origins: list[str] = Field(default_factory=list)
 
 
 settings = Settings()

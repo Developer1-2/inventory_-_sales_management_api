@@ -15,7 +15,7 @@ def test_app_error_format():
     def raise_error():
         raise AppError(400, "bad_request", "invalid payload")
 
-    app.add_api_route("/debug-error", raise_error, methods=["GET"])
+    app.add_api_route("/debug-error", raise_error, methods=["GET"], tags=["tests"])
     with TestClient(app) as client:
         response = client.get("/debug-error")
     assert response.status_code == 400

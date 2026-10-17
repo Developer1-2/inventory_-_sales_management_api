@@ -69,9 +69,10 @@ def create_staff_member(
         if location_ids:
             tx.execute(
                 text(
-                    "DELETE FROM membership_locations WHERE membership_id = :membership_id"
+                    "DELETE FROM membership_locations "
+                    "WHERE membership_id = :membership_id AND business_id = :business_id"
                 ),
-                {"membership_id": membership_id},
+                {"membership_id": membership_id, "business_id": auth.business_id},
             )
             tx.execute(
                 text(
@@ -99,9 +100,11 @@ def create_staff_member(
     ).fetchone()
     location_rows = conn.execute(
         text(
-            "SELECT location_id FROM membership_locations WHERE membership_id = :membership_id ORDER BY location_id"
+            "SELECT location_id FROM membership_locations "
+            "WHERE membership_id = :membership_id AND business_id = :business_id "
+            "ORDER BY location_id"
         ),
-        {"membership_id": membership_id},
+        {"membership_id": membership_id, "business_id": auth.business_id},
     ).fetchall()
     return StaffMemberOut(
         membership_id=int(row[0]),
@@ -134,9 +137,11 @@ def list_staff_members(
     for row in rows:
         location_rows = conn.execute(
             text(
-                "SELECT location_id FROM membership_locations WHERE membership_id = :membership_id ORDER BY location_id"
+                "SELECT location_id FROM membership_locations "
+                "WHERE membership_id = :membership_id AND business_id = :business_id "
+                "ORDER BY location_id"
             ),
-            {"membership_id": row[0]},
+            {"membership_id": row[0], "business_id": auth.business_id},
         ).fetchall()
         members.append(
             StaffMemberOut(
@@ -180,9 +185,16 @@ def update_staff_member(
 
     if update_values:
         assignments = [f"{key} = :{key}" for key in update_values]
-        params = {"membership_id": membership_id, **update_values}
+        params = {
+            "membership_id": membership_id,
+            "business_id": auth.business_id,
+            **update_values,
+        }
         conn.execute(
-            text(f"UPDATE memberships SET {', '.join(assignments)} WHERE id = :membership_id"),
+            text(
+                f"UPDATE memberships SET {', '.join(assignments)} "
+                "WHERE id = :membership_id AND business_id = :business_id"
+            ),
             params,
         )
 
@@ -199,8 +211,11 @@ def update_staff_member(
         if missing:
             raise AppError(404, "location_not_found", f"Location(s) not found: {missing}")
         conn.execute(
-            text("DELETE FROM membership_locations WHERE membership_id = :membership_id"),
-            {"membership_id": membership_id},
+            text(
+                "DELETE FROM membership_locations "
+                "WHERE membership_id = :membership_id AND business_id = :business_id"
+            ),
+            {"membership_id": membership_id, "business_id": auth.business_id},
         )
         conn.execute(
             text(
@@ -224,9 +239,11 @@ def update_staff_member(
     ).fetchone()
     location_rows = conn.execute(
         text(
-            "SELECT location_id FROM membership_locations WHERE membership_id = :membership_id ORDER BY location_id"
+            "SELECT location_id FROM membership_locations "
+            "WHERE membership_id = :membership_id AND business_id = :business_id "
+            "ORDER BY location_id"
         ),
-        {"membership_id": membership_id},
+        {"membership_id": membership_id, "business_id": auth.business_id},
     ).fetchall()
     return StaffMemberOut(
         membership_id=int(row[0]),

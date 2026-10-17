@@ -65,7 +65,8 @@ def list_locations(
                 "SELECT l.id, l.business_id, l.name, l.address, l.is_active "
                 "FROM locations l "
                 "JOIN membership_locations ml ON ml.location_id = l.id "
-                "WHERE l.business_id = :business_id AND ml.membership_id = :membership_id "
+                "WHERE l.business_id = :business_id AND ml.business_id = :business_id "
+                "AND ml.membership_id = :membership_id "
                 "ORDER BY l.id LIMIT :limit OFFSET :offset"
             ),
             {
