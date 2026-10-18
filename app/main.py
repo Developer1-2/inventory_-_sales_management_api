@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
+
 from app.core.config import settings
 from app.core.errors import AppError, app_error_handler, validation_error_handler
 from app.core.limiting import limiter
@@ -15,7 +16,7 @@ from app.routers.products import router as products_router
 from app.routers.reports import router as reports_router
 from app.routers.staff import router as staff_router
 from app.routers.stock_entries import router as stock_entries_router
-
+import uvicorn
 app = FastAPI(title="Inventory & Sales Management API")
 app.state.limiter = limiter
 
@@ -42,3 +43,9 @@ app.include_router(stock_entries_router)
 @app.get("/health", tags=["health"])
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    # Notice the module path "app.main:app" instead of just "app"
+    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True)

@@ -70,6 +70,7 @@ def register_business(
             )
             membership_id = membership_result.lastrowid
     except Exception as exc:  # pragma: no cover - DB integrity fallback
+        return {exc}
         raise AppError(400, "registration_failed", "Unable to create business account") from exc
 
     token = create_access_token(
